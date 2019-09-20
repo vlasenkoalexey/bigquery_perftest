@@ -1,0 +1,24 @@
+FROM ubuntu:disco
+
+# Installs necessary dependencies.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	 python3-venv python3-pip
+
+RUN pip3 install --upgrade pip
+RUN pip3 install setuptools requests wheel
+RUN pip3 install google-cloud-bigquery-storage
+RUN pip3 install tensorflow-io-nightly # also installs tensorflow
+ENV PROJECT_ID=alekseyv-scalableai-dev
+ENV GOOGLE_APPLICATION_CREDENTIALS=/root/models/alekseyv-scalableai-dev-077efe757ef6.json
+
+COPY . /root/models/
+WORKDIR /root/models
+
+ENV PYTHONPATH "${PYTHONPATH}:/root/models/"
+ENV PYTHONIOENCODING=utf-8
+ENV PYTHONUNBUFFERED=TRUE
+
+# ENV TF_CPP_VMODULE=gcs_file_system=2
+# ENV TF_CPP_MIN_VLOG_LEVEL=1
+
+# ENTRYPOINT ["python3", "/root/models/bq_perftest.py", "--project_id=alekseyv-scalableai-dev", "--requested_streams=1"]

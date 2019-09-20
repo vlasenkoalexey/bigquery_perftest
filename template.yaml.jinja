@@ -1,0 +1,152 @@
+{%- set fullname =  name + "-" + num_workers|string + "-" + num_gpus_per_worker|string -%}
+{%- set batch_size = 128 * num_gpus_per_worker -%}
+{%- set port = 5000 -%}
+
+{%- set replicas = {"worker": num_workers,
+                    "chief":1,
+                    "ps": num_ps,
+                    "evaluator": has_eval|int,
+                    "tensorboard": has_tensorboard|int} -%}
+
+{%- macro chief_host() -%}
+    \"{{ name }}-chief-0:{{ port }}\"
+{%- endmacro -%}
+
+{%- macro worker_hosts() -%}
+  {%- for i in range(num_workers) -%}
+    {%- if not loop.first -%},{%- endif -%}
+    \"{{ name }}-worker-{{ i }}:{{ port }}\"
+  {%- endfor -%}
+{%- endmacro -%}
+
+{%- macro ps_hosts() -%}
+  {%- for i in range(num_ps) -%}
+    {%- if not loop.first -%},{%- endif -%}
+    \"{{ name }}-ps-{{ i }}:{{ port }}\"
+  {%- endfor -%}
+{%- endmacro -%}
+
+{%- macro tf_config(task_type, task_id) -%}
+{
+  \"cluster\": {
+    \"chief\": [{{ chief_host() }}]
+    {%- if num_workers > 0 -%},
+    \"worker\": [{{ worker_hosts() }}]
+    {%- endif -%}
+    {%- if num_ps > 0 -%}, \"ps\": [{{ ps_hosts() }}]{%- endif -%}
+    {%- if has_eval -%},
+    \"evaluator\": [\"{{ name }}-evaluator-0:{{ port }}\"]{%- endif -%}
+  },
+  \"task\": {
+    \"type\":  \"{{ task_type }}\", 
+    \"index\": {{ task_id }}
+  },
+  \"environment\": \"cloud\"
+}
+{%- endmacro -%}
+
+{% for job in ["worker", "ps", "evaluator", "tensorboard", "chief"] -%}
+{%- for i in range(replicas[job]) -%}
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ name }}-{{ job }}-{{ i }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    job: {{ name }}-{{ job }}-{{ i }}
+  ports:
+  - port: {{ port }}
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: {{ name }}
+metadata:
+  name: {{ name }}-{{ job }}-{{ i }}
+  labels:
+    job: {{ name }}-{{ job }}-{{ i }}
+spec:
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
+  restartPolicy: OnFailure
+{% if job == "tensorboard" %}
+  containers:
+  - name: tensorflow
+    image: tensorflow/tensorflow
+{% else %}
+  containers:
+  - name: tensorflow
+    image: {{ image }}
+    imagePullPolicy: Always
+    resources:
+      limits:
+        cpu: 4
+{% if job == "ps" %}
+        memory: 10G
+{% else %}
+        memory: 15G
+        nvidia.com/gpu: {{ num_gpus_per_worker }}
+{% endif %}
+{% endif %}
+    # volumeMounts:
+    # - mountPath: "/training_data/"
+    #   name: soroush-gke-disk
+    env:
+    - name: BENCHMARK_NCCL
+      value: "true"
+    - name: BENCHMARK_NETWORK
+      value: "true"
+    - name: NCCL_SOCKET_IFNAME
+      value: "eth0"
+    - name: IPERF_PRINT_MSS
+      value: "1"
+    - name: TCP_WINDOW_SIZE
+      value: "16777216"
+    # - name: SET_RING
+    #   value: "true"
+{% if job != "tensorboard" %}
+    - name: TF_CONFIG
+      value: "{{ tf_config(job, i) }}"
+{% endif %}
+    ports:
+    - containerPort: {{ port }}
+{% if job == "tensorboard" %}
+    command:
+    - "tensorboard"
+    args:
+    - "--logdir={{ train_dir }}"
+    - "--port={{ port }}"
+{% else %}
+    args:
+{%- for cmdline_arg in cmdline_arg_list %}
+    - "{{ cmdline_arg }}"
+{%- endfor -%}
+{% endif %}
+  volumes:
+    - name: cache-volume
+      emptyDir: { medium: "Memory" }
+    # - name: soroush-gke-disk
+    #   persistentVolumeClaim:
+    #     claimName: soroush-gke-disk-claim
+  initContainers:
+  - name: init-sysctl
+    image: busybox
+    command:
+    - /bin/sh
+    - -c
+    - |
+      sysctl -w net.core.rmem_max=16777216
+      sysctl -w net.core.wmem_max=16777216
+      sysctl -w net.core.rmem_default=16777216
+      sysctl -w net.core.wmem_default=16777216
+      sysctl -w net.ipv4.tcp_rmem='4096 87380 16777216'
+      sysctl -w net.ipv4.tcp_wmem='4096 87380 16777216'
+      sysctl -w net.ipv4.tcp_mem='1638400 1638400 1638400'          
+    securityContext:
+      privileged: true    
+---
+{% endfor %}
+{%- endfor -%}
+
