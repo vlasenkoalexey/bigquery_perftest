@@ -14,11 +14,15 @@ from tensorflow_io.bigquery import BigQueryClient
 from tensorflow_io.bigquery import BigQueryReadSession
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("project_id", "",
+flags.DEFINE_string("project_id", None,
                     "GCP project id.")
 flags.mark_flag_as_required("project_id")             
 flags.DEFINE_integer("num_iterations", 1000, "Number of batchs to load.")
 flags.DEFINE_integer("requested_streams", 1, "Number of streams.")
+flags.DEFINE_integer("batch_size", 2048, "Batch size.")
+flags.DEFINE_bool("sloppy", False, 
+  "If True the implementation is allowed, for the sake of expediency, to produce"
+  "elements in a non-deterministic order")
 
 DATASET_GCP_PROJECT_ID = "bigquery-public-data"
 DATASET_ID = "samples"
@@ -27,7 +31,8 @@ TABLE_ID = "wikipedia"
 
 def run_benchmark(_):
   num_iterations = FLAGS.num_iterations
-  batch_size = 2048
+  batch_size = FLAGS.batch_size
+  print('Batch size: %d, Sloppy: %s' % (batch_size, FLAGS.sloppy))
   client = BigQueryClient()
   read_session = client.read_session(
       "projects/" + FLAGS.project_id,
@@ -48,7 +53,12 @@ def run_benchmark(_):
        dtypes.string],
       requested_streams=FLAGS.requested_streams
       )
-  dataset = read_session.parallel_read_rows().batch(batch_size)
+  
+  streams = read_session.get_streams()
+  print('Requested %d streams, BigQuery returned %d streams' % (
+    len(streams), 
+    FLAGS.requested_streams))
+  dataset = read_session.parallel_read_rows(sloppy=FLAGS.sloppy).batch(batch_size)
   itr = dataset.make_one_shot_iterator()
 
   start = time.time()
