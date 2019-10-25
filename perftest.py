@@ -63,6 +63,7 @@ def get_dataset_from_gcs():
       map_func=tf.data.TFRecordDataset,
       cycle_length=FLAGS.requested_streams,
       sloppy=FLAGS.sloppy)) \
+      .prefetch(100000) \
       .batch(FLAGS.batch_size) \
       .map (lambda tf_records_batch:
         tf.io.parse_example(tf_records_batch, FEATURE_DESCRIPTION))
@@ -95,7 +96,9 @@ def get_dataset_from_bigquery():
   print('Requested %d streams, BigQuery returned %d streams' % (
     len(streams),
     FLAGS.requested_streams))
-  dataset = read_session.parallel_read_rows(sloppy=FLAGS.sloppy).batch(FLAGS.batch_size)
+  dataset = read_session.parallel_read_rows(sloppy=FLAGS.sloppy) \
+    .prefetch(100000) \
+    .batch(FLAGS.batch_size)
   return dataset
 
 def run_benchmark(_):
@@ -112,7 +115,6 @@ def run_benchmark(_):
     print('Invalid data_source:' + data_source)
     exit(1)
 
-  dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
   num_iterations = FLAGS.num_iterations
   itr = tf.compat.v1.data.make_one_shot_iterator(dataset)
   start = time.time()
