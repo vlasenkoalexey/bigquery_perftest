@@ -63,10 +63,11 @@ def get_dataset_from_gcs():
       map_func=tf.data.TFRecordDataset,
       cycle_length=FLAGS.requested_streams,
       sloppy=FLAGS.sloppy)) \
-      .prefetch(100000) \
       .batch(FLAGS.batch_size) \
       .map (lambda tf_records_batch:
-        tf.io.parse_example(tf_records_batch, FEATURE_DESCRIPTION))
+        tf.io.parse_example(tf_records_batch, FEATURE_DESCRIPTION),
+        num_parallel_calls=FLAGS.requested_streams) \
+      .prefetch(100)
   return dataset
 
 def get_dataset_from_bigquery():
@@ -97,8 +98,8 @@ def get_dataset_from_bigquery():
     len(streams),
     FLAGS.requested_streams))
   dataset = read_session.parallel_read_rows(sloppy=FLAGS.sloppy) \
-    .prefetch(100000) \
-    .batch(FLAGS.batch_size)
+    .batch(FLAGS.batch_size) \
+    .prefetch(100)
   return dataset
 
 def run_benchmark(_):
