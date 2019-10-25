@@ -57,19 +57,16 @@ def get_row_size_bytes(row):
 
 def get_dataset_from_gcs():
   filenames = tf.io.gfile.glob(GCS_DATASET_FILE_PATTERN)
-  dataset = tf.data.Dataset.from_tensor_slices(filenames).repeat()
-  dataset = dataset.apply(tf.data.experimental.parallel_interleave(
+  dataset = tf.data.Dataset.from_tensor_slices(filenames) \
+    .repeat() \
+    .apply(tf.data.experimental.parallel_interleave(
       map_func=tf.data.TFRecordDataset,
       cycle_length=FLAGS.requested_streams,
-      sloppy=FLAGS.sloppy)).batch(FLAGS.batch_size)
+      sloppy=FLAGS.sloppy)) \
+      .batch(FLAGS.batch_size) \
+      .map (lambda tf_records_batch:
+        tf.io.parse_example(tf_records_batch, FEATURE_DESCRIPTION))
   return dataset
-
-def parse_row(row):
-  if FLAGS.data_source == 'GCS':
-    row = tf.io.parse_example(row, FEATURE_DESCRIPTION)
-    return row
-  else:
-    return row
 
 def get_dataset_from_bigquery():
   print('Batch size: %d, Sloppy: %s' % (FLAGS.batch_size, FLAGS.sloppy))
@@ -101,7 +98,6 @@ def get_dataset_from_bigquery():
   dataset = read_session.parallel_read_rows(sloppy=FLAGS.sloppy).batch(FLAGS.batch_size)
   return dataset
 
-
 def run_benchmark(_):
   data_source = FLAGS.data_source
   batch_size = FLAGS.batch_size
@@ -116,6 +112,7 @@ def run_benchmark(_):
     print('Invalid data_source:' + data_source)
     exit(1)
 
+  dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
   num_iterations = FLAGS.num_iterations
   itr = tf.compat.v1.data.make_one_shot_iterator(dataset)
   start = time.time()
@@ -128,7 +125,7 @@ def run_benchmark(_):
     local_size_bytes = 0
     for j in range(mini_batch):
       n += batch_size
-      row = parse_row(itr.get_next())
+      row = itr.get_next()
       if FLAGS.get_size_bytes:
         local_size_bytes += get_row_size_bytes(row)
     size_bytes += local_size_bytes
