@@ -8,20 +8,19 @@ import time
 import os
 
 import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
 
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("data_files_pattern", "",
+flags.DEFINE_string("data_files_pattern", "gs://cloud-samples-data/ai-platform/fake_imagenet/train*",
                     "TFRecords input pattern.")
-flags.mark_flag_as_required("data_files_pattern")
 flags.DEFINE_integer("num_iterations", 1000, "Number of batchs to load.")
-
+flags.DEFINE_integer("cycle_length", 20, "cycle_length parameter for parallel_interleave")
 
 def input_fn(data_files_pattern,
              batch_size,
              num_iterations=1):
-  filenames = tf.gfile.Glob(data_files_pattern)
-  print (filenames)
+  filenames = tf.io.gfile.glob(data_files_pattern)
   dataset = tf.data.Dataset.from_tensor_slices(filenames).repeat()
 
   def _read_fn(f):
@@ -29,7 +28,7 @@ def input_fn(data_files_pattern,
 
   dataset = dataset.apply(tf.data.experimental.parallel_interleave(
       map_func=_read_fn,
-      cycle_length=20,
+      cycle_length=FLAGS.cycle_length,
       block_length=1,
       sloppy=True,
       buffer_output_elements=50000,
@@ -46,9 +45,9 @@ def run_benchmark(_):
   dataset = input_fn(
         data_files_pattern=FLAGS.data_files_pattern,
         batch_size=batch_size)
-  itr = dataset.make_one_shot_iterator()
+  itr = tf.compat.v1.data.make_one_shot_iterator(dataset)
   size = tf.shape(itr.get_next())[0]
-  with tf.Session() as sess:
+  with tf.compat.v1.Session() as sess:
     size_callable = sess.make_callable(size)
     start = time.time()
     n = 0
