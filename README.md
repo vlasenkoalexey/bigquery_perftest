@@ -1,10 +1,13 @@
+# TensorFlow BigQuery connector benchmark
+This project allows benchmarking TensorFlow BigQuery connector with different parameters (batch_size, number of columns, etc.) and in different environments (TensorFlow + TensorFlow/IO versions).
+
 # Setup
 ```sh
 export PROJECT_ID="alekseyv-scalableai-dev"
 gcloud iam service-accounts keys create ./service_account_key.json --iam-account=${USER}-service@${PROJECT_ID}.iam.gserviceaccount.com
 ```
 
-# Benchmarks
+# Running benchmark in different environments
 ## 1 stream
 
 ### Local TF2.3 + custom TF.IO build
