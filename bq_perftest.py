@@ -9,7 +9,8 @@ import time
 import os
 import numpy
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_eager_execution()
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import dtypes
 from tensorflow_io.bigquery import BigQueryClient
@@ -67,9 +68,9 @@ def run_benchmark(_):
       )
   
   streams = read_session.get_streams()
-  print('Requested %d streams, BigQuery returned %d streams' % (
-    len(streams), 
-    FLAGS.requested_streams))
+  # print('Requested %d streams, BigQuery returned %d streams' % (
+  #   len(streams), 
+  #   FLAGS.requested_streams))
   dataset = read_session.parallel_read_rows(sloppy=FLAGS.sloppy).batch(batch_size)
   itr = dataset.make_one_shot_iterator()
 

@@ -13,16 +13,16 @@ from tensorflow.python.framework import ops
 from tensorflow.python.framework import dtypes
 from tensorflow_io.bigquery import BigQueryClient
 from tensorflow_io.bigquery import BigQueryReadSession
-
+a
 # Sample command run:
-# python3 bq_perftest_mult_columns.py --project_id=alekseyv-scalableai-dev --batch_size=2048 --num_iterations=100 --mini_batch_size=10 --num_columns=120 --requested_streams=20
+# python3 bq_perftest_mult_columns.py --project_id=alekseyv-gke --batch_size=2048 --num_iterations=100 --mini_batch_size=10 --num_columns=120 --requested_streams=20
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string("project_id", None, "GCP project id.")
 flags.mark_flag_as_required("project_id")
 flags.DEFINE_integer("num_iterations", 1000, "Number of batches to load.")
 flags.DEFINE_integer("num_warmup_iterations", 10,
-                     "Number of warmup batches to load that doesn't count towards benchmark results.")
+                     "Number of warmup batches to load that doesn'ta count towards benchmark results.")
 flags.DEFINE_integer("requested_streams", 1, "Number of streams.")
 flags.DEFINE_integer("batch_size", 2048, "Batch size.")
 flags.DEFINE_integer("prefetch_size", None, "Prefetch size.")
@@ -47,7 +47,7 @@ flags.DEFINE_enum("data_source", "BQ", [
 flags.DEFINE_string("profile_log_path", "", "If this argument is specified, benchmark is going to be profiled and results dumped to the specified folder. Later you can run tensorboard --logidr=<profile_log_path> to inspect profile results. GCS file format is supported.")
 
 # Dataset has ~45M rows
-DATASET_GCP_PROJECT_ID = "alekseyv-scalableai-dev"
+DATASET_GCP_PROJECT_ID = "alekseyv-gke"
 DATASET_ID = "criteo_kaggle_2"
 TABLE_ID = "days_duplicated_columns"
 
